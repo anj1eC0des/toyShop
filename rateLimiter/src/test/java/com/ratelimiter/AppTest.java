@@ -1,4 +1,4 @@
-package com.hospital;
+package com.ratelimiter;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
