@@ -13,10 +13,11 @@ public class App {
     private static final ConcurrentHashMap<String, AtomicReference<Bucket>> tokenBucket=
             new ConcurrentHashMap<>();
     private static final Logger log= LoggerFactory.getLogger(App.class);
-    final static int MAX_TOKENS=15;
-    final static int BASE_TOKENS=10;
-    final static long REFILL_DURATION = 10_000_000_000L;
-    record Bucket(int tokens,long lastRefill){}
+    final static int MAX_TOKENS=1000;
+    final static int BASE_TOKENS=100;
+    final static int REFILL_RATE=100;
+    final static long REFILL_DURATION = 1000_000_000L;
+    record Bucket(long tokens, long lastRefill){}
     public static void main( String[] args ) {
         try{
             InetSocketAddress address= new InetSocketAddress(8080);
@@ -26,21 +27,20 @@ public class App {
             else{
                 HttpServer server=HttpServer.create(
                        address,10);
-                server.setExecutor(Executors.newFixedThreadPool(10));
+                int cores = Runtime.getRuntime().availableProcessors();
+                server.setExecutor(Executors.newFixedThreadPool(cores * 2));
                 server.createContext("/",(exchange)->{
                     long now=System.nanoTime();
                     String ip= exchange.getRemoteAddress().getAddress().getHostAddress();
-                    AtomicReference<Bucket> bucket= tokenBucket.computeIfAbsent(ip,
-                            (k)-> new AtomicReference<>(new Bucket(MAX_TOKENS,now)));
+                    AtomicReference<Bucket>bucket= tokenBucket.computeIfAbsent(ip,
+                            (k)-> new AtomicReference<>(new Bucket(BASE_TOKENS,now)));
                     Bucket updatedBucket= bucket.updateAndGet(oldBucket->{
-                       int oldTokens = oldBucket.tokens();
+                       long oldTokens = oldBucket.tokens();
                        long lastRefill=oldBucket.lastRefill();
-                       if(oldTokens<=0 && now-lastRefill>=REFILL_DURATION){
-                           oldTokens=BASE_TOKENS;
-                           lastRefill=now;
-                       }
+                       long elapsed=now-lastRefill;
+                       oldTokens=Math.min(oldTokens+((elapsed*REFILL_RATE)/REFILL_DURATION),MAX_TOKENS);
                        if(oldTokens<=0) return oldBucket;
-                       return new Bucket(oldTokens-1,lastRefill);
+                       return new Bucket(oldTokens-1,now);
                     });
                     if(updatedBucket.tokens()<=0) {
                         String badResponse = "Too many hits!";
@@ -66,6 +66,5 @@ public class App {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
     }
 }
