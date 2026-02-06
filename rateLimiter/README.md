@@ -34,11 +34,18 @@
 ### Last Benchmark
 
 Running 10s test @ http://localhost:8080/
-10 threads and 10 connections
+20 threads and 20 connections
 Thread Stats   Avg      Stdev     Max   +/- Stdev
-Latency    43.86ms    2.90ms  48.49ms   97.94%
-Req/Sec    22.78      4.51    30.00     72.00%
-2280 requests in 10.03s, 186.94KB read
-Non-2xx or 3xx responses: 858
-Requests/sec:    227.41
-Transfer/sec:     18.65KB
+Latency    43.87ms    2.92ms  48.47ms   97.83%
+Req/Sec    22.76      4.49    30.00     72.15%
+4557 requests in 10.03s, 380.83KB read
+Non-2xx or 3xx responses: 2767
+Requests/sec:    454.53
+Transfer/sec:     37.99KB
+
+---
+
+### Learning highlights
+
+- Different rate limiting algorithms.
+- Performance of locks vs cas in high contention scenarios.

@@ -7,16 +7,15 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class App {
-    private static final ConcurrentHashMap<String, AtomicReference<Bucket>> tokenBucket=
+    private static final ConcurrentHashMap<String, Bucket> tokenBucket=
             new ConcurrentHashMap<>();
     private static final Logger log= LoggerFactory.getLogger(App.class);
     final static int MAX_TOKENS=1000;
     final static int BASE_TOKENS=100;
-    final static int REFILL_RATE=100;
-    final static long REFILL_DURATION = 1000_000_000L;
+    final static long REFILL_DURATION = 10_000_000L;
     record Bucket(long tokens, long lastRefill){}
     public static void main( String[] args ) {
         try{
@@ -30,26 +29,31 @@ public class App {
                 int cores = Runtime.getRuntime().availableProcessors();
                 server.setExecutor(Executors.newFixedThreadPool(cores * 2));
                 server.createContext("/",(exchange)->{
-                    long now=System.nanoTime();
+                    AtomicBoolean notAllowed = new AtomicBoolean(true);
                     String ip= exchange.getRemoteAddress().getAddress().getHostAddress();
-                    AtomicReference<Bucket>bucket= tokenBucket.computeIfAbsent(ip,
-                            (k)-> new AtomicReference<>(new Bucket(BASE_TOKENS,now)));
-                    Bucket updatedBucket= bucket.updateAndGet(oldBucket->{
-                       long oldTokens = oldBucket.tokens();
-                       long lastRefill=oldBucket.lastRefill();
-                       long elapsed=now-lastRefill;
-                       oldTokens=Math.min(oldTokens+((elapsed*REFILL_RATE)/REFILL_DURATION),MAX_TOKENS);
-                       if(oldTokens<=0) return oldBucket;
-                       return new Bucket(oldTokens-1,now);
+                    tokenBucket.compute(ip,(k,oldBucket)->{
+                        if(oldBucket==null) {
+                            notAllowed.set(false);
+                            return new Bucket(BASE_TOKENS-1,System.nanoTime());
+                        }
+                        long now=System.nanoTime();
+                        long lastRefill=oldBucket.lastRefill();
+                        long elapsed=now-lastRefill;
+                        long oldTokens = oldBucket.tokens();
+                        long newTokens=Math.min(oldTokens+(elapsed/REFILL_DURATION),MAX_TOKENS);
+                        if(newTokens<=0) return new Bucket(0,lastRefill);
+                        notAllowed.set(false);
+                        if(newTokens!=oldTokens) return new Bucket(newTokens-1,now);
+                        return new Bucket(oldTokens-1,lastRefill);
                     });
-                    if(updatedBucket.tokens()<=0) {
+                    if(notAllowed.get()) {
                         String badResponse = "Too many hits!";
-                        exchange.sendResponseHeaders(429, badResponse.length());
+                        exchange.sendResponseHeaders(429, badResponse.getBytes().length);
                         exchange.getResponseBody().write(badResponse.getBytes());
                         exchange.close();
                     }else{
                         String response="HELLO!";
-                        exchange.sendResponseHeaders(200,response.length());
+                        exchange.sendResponseHeaders(200,response.getBytes().length);
                         exchange.getResponseBody().write(response.getBytes());
                         exchange.close();
                     }
