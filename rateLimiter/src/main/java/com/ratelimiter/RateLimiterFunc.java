@@ -9,10 +9,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.netty.handler.codec.http.HttpHeaderNames.*;
-import static io.netty.handler.codec.http.HttpHeaderValues.CLOSE;
 import static io.netty.handler.codec.http.HttpHeaderValues.TEXT_PLAIN;
 
 public class RateLimiterFunc {
@@ -22,27 +20,24 @@ public class RateLimiterFunc {
     final static int MAX_TOKENS=1000;
     final static int BASE_TOKENS=100;
     final static long REFILL_DURATION = 10_000_000L;
-    record Bucket(long tokens, long lastRefill){}
-    static FullHttpResponse responseHandler(HttpRequest request,
-                                            String ip){
-        AtomicBoolean notAllowed = new AtomicBoolean(true);
-        tokenBucket.compute(ip,(k,oldBucket)->{
+    record Bucket(long tokens,long lastRefill,boolean notAllowed){}
+
+    static FullHttpResponse responseHandler(HttpRequest request, String ip){
+        long now=System.nanoTime();
+        boolean notAllowed=tokenBucket.compute(ip,(k,oldBucket)->{
             if(oldBucket==null) {
-                notAllowed.set(false);
-                return new Bucket(BASE_TOKENS-1,System.nanoTime());
+                return new Bucket(BASE_TOKENS-1,now,false);
             }
-            long now=System.nanoTime();
             long lastRefill=oldBucket.lastRefill();
             long elapsed=now-lastRefill;
             long oldTokens = oldBucket.tokens();
             long newTokens=Math.min(oldTokens+(elapsed/REFILL_DURATION),MAX_TOKENS);
-            if(newTokens<=0) return new Bucket(0,lastRefill);
-            notAllowed.set(false);
-            if(newTokens!=oldTokens) return new Bucket(newTokens-1,now);
-            return new Bucket(oldTokens-1,lastRefill);
-        });
+            if(newTokens<=0) return new Bucket(0,lastRefill,true);
+            if(newTokens!=oldTokens) return new Bucket(newTokens-1,now,false);
+            return new Bucket(oldTokens-1,lastRefill,false);
+        }).notAllowed();
         FullHttpResponse response;
-        if(notAllowed.get()) {
+        if(notAllowed) {
             log.info("Rate limited {}",ip);
             String badResponse = "Too many hits!";
             response=new DefaultFullHttpResponse(request.protocolVersion(),

@@ -29,6 +29,9 @@
 **Rationale**: Widely used in all popular enterprise rate limiters. 
 **Alternatives considered**: Leaky Bucket, Sliding window.
 
+**Decision**: Used netty instead of standard-library webserver.
+**Rationale**: High performance and asynchronous.
+
 ---
 
 ### Last Benchmark
@@ -36,12 +39,17 @@
 Running 10s test @ http://localhost:8080/
 20 threads and 20 connections
 Thread Stats   Avg      Stdev     Max   +/- Stdev
-Latency     6.31ms   20.25ms 220.15ms   94.94%
-Req/Sec   487.85    213.02     1.57k    75.04%
-95976 requests in 10.10s, 12.19MB read
-Non-2xx or 3xx responses: 93988
-Requests/sec:   9504.03
-Transfer/sec:      1.21MB
+Latency     1.53ms    1.30ms  34.34ms   92.02%
+Req/Sec   696.95    229.52     3.92k    66.18%
+Latency Distribution
+50%    1.34ms
+75%    1.88ms
+90%    2.57ms
+99%    4.55ms
+138971 requests in 10.10s, 17.68MB read
+Non-2xx or 3xx responses: 136970
+Requests/sec:  13760.31
+Transfer/sec:      1.75MB
 
 ---
 
@@ -49,3 +57,4 @@ Transfer/sec:      1.21MB
 
 - Different rate limiting algorithms.
 - Performance of locks vs cas in high contention scenarios.
+- Using blocking vs non-blocking options.

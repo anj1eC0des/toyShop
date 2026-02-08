@@ -40,11 +40,5 @@ public class RateLimiterHandler extends SimpleChannelInboundHandler<HttpRequest>
     public void exceptionCaught(ChannelHandlerContext ctx,Throwable cause){
         log.warn(Arrays.toString(cause.getStackTrace()));
         ctx.close();
-
     }
-
-//    @Override
-//    public void channelReadComplete(ChannelHandlerContext ctx){
-//        ctx.flush();
-//    }
 }
