@@ -19,6 +19,7 @@
 <!--        <module></module>-->
         <module>rateLimiter</module>
         <module>urlShortener</module>
+        <module>deduplicationServer</module>
     </modules>
     <properties>
         <java.version>19</java.version>
