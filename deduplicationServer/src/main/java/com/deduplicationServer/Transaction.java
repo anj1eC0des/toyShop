@@ -1,6 +1,5 @@
 package com.deduplicationServer;
 
-import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,24 +21,33 @@ public class Transaction{
     private final LocalDateTime timestamp;
     private final String hashedRequest;
     private final CompletableFuture<Data> response;
+    private final HttpVersion protocolVersion;
     private static final Logger log= LoggerFactory.getLogger(Transaction.class);
     public Transaction(String hashedRequest, HttpRequest request){
         this.status=Status.PROCESSING;
         this.timestamp= java.time.LocalDateTime.now();
         this.hashedRequest=hashedRequest;
+        this.protocolVersion=request.protocolVersion();
         log.info("New Transaction Created for {}",request.headers().get("IdempotencyKey"));
         this.response= processTransaction(request);
         this.response.thenAccept((response)-> this.status=Status.SUCCEEDED);
         this.response.exceptionally(exp->{
             this.status=Status.FAILED;
-            return new Data(request.protocolVersion(),
+            return new Data(protocolVersion,
                     HttpResponseStatus.INTERNAL_SERVER_ERROR,
                     "Failed message".getBytes(),
                     new DefaultHttpHeaders()
                             .set(CONTENT_TYPE,TEXT_PLAIN));
         });
     }
-    CompletableFuture<Data> getResponse(){
+    CompletableFuture<Data> getResponse(String hashedRequest){
+        if(!hashedRequest.equals(this.hashedRequest)){
+            return CompletableFuture.completedFuture( new Data(protocolVersion,
+                    HttpResponseStatus.UNPROCESSABLE_ENTITY,
+                    "Request hashes dont match!".getBytes(),
+                    new DefaultHttpHeaders()
+                            .set(CONTENT_TYPE, TEXT_PLAIN)));
+        }
         return this.response;
     }
     private CompletableFuture<Data> processTransaction(HttpRequest request){
