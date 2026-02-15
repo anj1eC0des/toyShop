@@ -20,6 +20,7 @@
         <module>rateLimiter</module>
         <module>urlShortener</module>
         <module>deduplicationServer</module>
+        <module>paymentProcessor</module>
     </modules>
     <properties>
         <java.version>19</java.version>
