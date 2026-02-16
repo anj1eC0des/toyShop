@@ -21,6 +21,7 @@
         <module>urlShortener</module>
         <module>deduplicationServer</module>
         <module>paymentProcessor</module>
+        <module>singleNodeKeyValueCache</module>
     </modules>
     <properties>
         <java.version>19</java.version>
